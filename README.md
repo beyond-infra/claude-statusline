@@ -6,11 +6,13 @@ A status line for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 
 
 ## Install
 
+Run the command below to set it up
+
 ```bash
 npx claude-line
 ```
 
-That's it. It copies the status line script to `~/.claude/statusline.sh` and configures your Claude Code settings.
+It backups your old status line if any and copies the status line script to `~/.claude/statusline.sh` and configures your Claude Code settings.
 
 ## Requirements
 
