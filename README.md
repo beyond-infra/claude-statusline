@@ -1,6 +1,6 @@
 # claude-statusline
 
-A status line for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that shows you useful info while you work.
+Configure your Claude Code statusline to shows limits, directory and git info
 
 ![demo](./.github/demo.png)
 
