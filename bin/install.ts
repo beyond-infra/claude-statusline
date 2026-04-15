@@ -14,9 +14,11 @@ const STATUSLINE_BAK = STATUSLINE_DST + ".bak";
 const NOTIFY_DST      = join(CLAUDE_DIR, "task-complete.ts");
 const NOTIFY_SRC      = resolve(dirname(new URL(import.meta.url).pathname), "task-complete.ts");
 const NOTIFY_BAK      = NOTIFY_DST + ".bak";
-const SWIFTBAR_DST    = join(CLAUDE_DIR, "swiftbar-plugin.ts");
-const SWIFTBAR_SRC    = resolve(dirname(new URL(import.meta.url).pathname), "swiftbar-plugin.ts");
-const SWIFTBAR_NAME   = "claude-status.5s.ts";
+const SWIFTBAR_TS_DST = join(CLAUDE_DIR, "swiftbar-plugin.ts");
+const SWIFTBAR_TS_SRC = resolve(dirname(new URL(import.meta.url).pathname), "swiftbar-plugin.ts");
+const SWIFTBAR_SH_DST = join(CLAUDE_DIR, "swiftbar-plugin.sh");
+const SWIFTBAR_SH_SRC = resolve(dirname(new URL(import.meta.url).pathname), "swiftbar-plugin.sh");
+const SWIFTBAR_NAME   = "claude-status.5s.sh";
 
 const STATUS_CMD = 'npx --yes tsx "$HOME/.claude/statusline.ts"';
 const NOTIFY_CMD = 'npx --yes tsx "$HOME/.claude/task-complete.ts"';
@@ -118,20 +120,24 @@ function install(): void {
     ok("Settings already configured");
   }
 
-  // SwiftBar plugin
-  copyFileSync(SWIFTBAR_SRC, SWIFTBAR_DST);
-  chmodSync(SWIFTBAR_DST, 0o755);
-  ok(`Installed SwiftBar plugin to ${c.dim}${SWIFTBAR_DST}${c.rst}`);
+  // SwiftBar plugin (.ts logic + .sh launcher)
+  copyFileSync(SWIFTBAR_TS_SRC, SWIFTBAR_TS_DST);
+  copyFileSync(SWIFTBAR_SH_SRC, SWIFTBAR_SH_DST);
+  chmodSync(SWIFTBAR_SH_DST, 0o755);
+  ok(`Installed SwiftBar plugin to ${c.dim}${SWIFTBAR_SH_DST}${c.rst}`);
 
   const swiftbarPluginDir = detectSwiftBarPluginDir();
   if (swiftbarPluginDir) {
     const pluginLink = join(swiftbarPluginDir, SWIFTBAR_NAME);
+    // Remove stale .ts symlink from previous install if present
+    const oldLink = join(swiftbarPluginDir, "claude-status.5s.ts");
+    if (existsSync(oldLink)) { unlinkSync(oldLink); }
     if (!existsSync(pluginLink)) {
       try {
-        symlinkSync(SWIFTBAR_DST, pluginLink);
+        symlinkSync(SWIFTBAR_SH_DST, pluginLink);
         ok(`Linked SwiftBar plugin → ${c.dim}${pluginLink}${c.rst}`);
       } catch {
-        warn(`Could not symlink to SwiftBar plugins dir — copy manually:\n    cp ${SWIFTBAR_DST} ${pluginLink}`);
+        warn(`Could not symlink to SwiftBar plugins dir — copy manually:\n    cp ${SWIFTBAR_SH_DST} ${pluginLink}`);
       }
     } else {
       ok("SwiftBar plugin already linked");
@@ -141,7 +147,7 @@ function install(): void {
     warn("SwiftBar not detected — to enable the menu bar widget:");
     log(`  1. ${c.dim}brew install --cask swiftbar${c.rst}`);
     log(`  2. Open SwiftBar, set plugin dir, then run:`);
-    log(`     ${c.dim}ln -s ${SWIFTBAR_DST} <plugin-dir>/${SWIFTBAR_NAME}${c.rst}`);
+    log(`     ${c.dim}ln -s ${SWIFTBAR_SH_DST} <plugin-dir>/${SWIFTBAR_NAME}${c.rst}`);
   }
 
   log(`\n${c.green}Done!${c.rst} Restart Claude Code to see your new status line and notifications.\n`);
@@ -173,9 +179,10 @@ function uninstall(): void {
     warn("No notify script found — nothing to remove");
   }
 
-  if (existsSync(SWIFTBAR_DST)) {
-    unlinkSync(SWIFTBAR_DST);
-    ok(`Removed ${c.dim}swiftbar-plugin.ts${c.rst}`);
+  if (existsSync(SWIFTBAR_TS_DST)) unlinkSync(SWIFTBAR_TS_DST);
+  if (existsSync(SWIFTBAR_SH_DST)) {
+    unlinkSync(SWIFTBAR_SH_DST);
+    ok(`Removed ${c.dim}swiftbar-plugin.sh${c.rst}`);
   }
 
   const swiftbarPluginDir = detectSwiftBarPluginDir();
