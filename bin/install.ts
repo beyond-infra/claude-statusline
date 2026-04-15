@@ -1,7 +1,7 @@
 #!/usr/bin/env npx --yes tsx
 
 import { execSync } from "child_process";
-import { existsSync, mkdirSync, copyFileSync, unlinkSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, copyFileSync, unlinkSync, readFileSync, writeFileSync, symlinkSync } from "fs";
 import { homedir } from "os";
 import { join, resolve, dirname } from "path";
 
@@ -11,9 +11,12 @@ const SETTINGS_FILE  = join(CLAUDE_DIR, "settings.json");
 const STATUSLINE_DST = join(CLAUDE_DIR, "statusline.ts");
 const STATUSLINE_SRC = resolve(dirname(new URL(import.meta.url).pathname), "statusline.ts");
 const STATUSLINE_BAK = STATUSLINE_DST + ".bak";
-const NOTIFY_DST     = join(CLAUDE_DIR, "task-complete.ts");
-const NOTIFY_SRC     = resolve(dirname(new URL(import.meta.url).pathname), "task-complete.ts");
-const NOTIFY_BAK     = NOTIFY_DST + ".bak";
+const NOTIFY_DST      = join(CLAUDE_DIR, "task-complete.ts");
+const NOTIFY_SRC      = resolve(dirname(new URL(import.meta.url).pathname), "task-complete.ts");
+const NOTIFY_BAK      = NOTIFY_DST + ".bak";
+const SWIFTBAR_DST    = join(CLAUDE_DIR, "swiftbar-plugin.ts");
+const SWIFTBAR_SRC    = resolve(dirname(new URL(import.meta.url).pathname), "swiftbar-plugin.ts");
+const SWIFTBAR_NAME   = "claude-status.5s.ts";
 
 const STATUS_CMD = 'npx --yes tsx "$HOME/.claude/statusline.ts"';
 const NOTIFY_CMD = 'npx --yes tsx "$HOME/.claude/task-complete.ts"';
@@ -115,6 +118,31 @@ function install(): void {
     ok("Settings already configured");
   }
 
+  // SwiftBar plugin
+  copyFileSync(SWIFTBAR_SRC, SWIFTBAR_DST);
+  ok(`Installed SwiftBar plugin to ${c.dim}${SWIFTBAR_DST}${c.rst}`);
+
+  const swiftbarPluginDir = detectSwiftBarPluginDir();
+  if (swiftbarPluginDir) {
+    const pluginLink = join(swiftbarPluginDir, SWIFTBAR_NAME);
+    if (!existsSync(pluginLink)) {
+      try {
+        symlinkSync(SWIFTBAR_DST, pluginLink);
+        ok(`Linked SwiftBar plugin → ${c.dim}${pluginLink}${c.rst}`);
+      } catch {
+        warn(`Could not symlink to SwiftBar plugins dir — copy manually:\n    cp ${SWIFTBAR_DST} ${pluginLink}`);
+      }
+    } else {
+      ok("SwiftBar plugin already linked");
+    }
+    log(`  ${c.dim}Refresh SwiftBar or wait 5s for the menu bar item to appear.${c.rst}`);
+  } else {
+    warn("SwiftBar not detected — to enable the menu bar widget:");
+    log(`  1. ${c.dim}brew install --cask swiftbar${c.rst}`);
+    log(`  2. Open SwiftBar, set plugin dir, then run:`);
+    log(`     ${c.dim}ln -s ${SWIFTBAR_DST} <plugin-dir>/${SWIFTBAR_NAME}${c.rst}`);
+  }
+
   log(`\n${c.green}Done!${c.rst} Restart Claude Code to see your new status line and notifications.\n`);
 }
 
@@ -142,6 +170,20 @@ function uninstall(): void {
     ok(`Removed ${c.dim}task-complete.ts${c.rst}`);
   } else {
     warn("No notify script found — nothing to remove");
+  }
+
+  if (existsSync(SWIFTBAR_DST)) {
+    unlinkSync(SWIFTBAR_DST);
+    ok(`Removed ${c.dim}swiftbar-plugin.ts${c.rst}`);
+  }
+
+  const swiftbarPluginDir = detectSwiftBarPluginDir();
+  if (swiftbarPluginDir) {
+    const pluginLink = join(swiftbarPluginDir, SWIFTBAR_NAME);
+    if (existsSync(pluginLink)) {
+      unlinkSync(pluginLink);
+      ok(`Removed SwiftBar plugin link from ${c.dim}${pluginLink}${c.rst}`);
+    }
   }
 
   if (existsSync(SETTINGS_FILE)) {
@@ -174,6 +216,29 @@ function uninstall(): void {
   }
 
   log(`\n${c.green}Done!${c.rst} Restart Claude Code to apply changes.\n`);
+}
+
+// ── SwiftBar plugin dir detection ────────────────────────
+function detectSwiftBarPluginDir(): string | null {
+  // SwiftBar stores plugin dir in ~/Library/Application Support/SwiftBar/PluginDirectory.txt
+  const plistPath = join(homedir(), "Library", "Application Support", "SwiftBar", "PluginDirectory.txt");
+  if (existsSync(plistPath)) {
+    try {
+      const dir = readFileSync(plistPath, "utf-8").trim();
+      if (dir && existsSync(dir)) return dir;
+    } catch {}
+  }
+
+  // Fallback: check common default locations
+  const candidates = [
+    join(homedir(), "Library", "Application Support", "SwiftBar", "Plugins"),
+    join(homedir(), ".config", "swiftbar"),
+  ];
+  for (const dir of candidates) {
+    if (existsSync(dir)) return dir;
+  }
+
+  return null;
 }
 
 // ── Entry ────────────────────────────────────────────────

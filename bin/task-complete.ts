@@ -1,8 +1,9 @@
 #!/usr/bin/env npx --yes tsx
 
 import { execSync } from "child_process";
-import { readFileSync } from "fs";
-import { basename } from "path";
+import { readFileSync, writeFileSync } from "fs";
+import { homedir } from "os";
+import { join, basename } from "path";
 
 // ── Parse stdin ──────────────────────────────────────────
 let input: Record<string, any> = {};
@@ -57,6 +58,18 @@ if (persistent) {
     execSync(`osascript -e 'display notification "${body}" with title "Claude 任务完成"'`);
   } catch {}
 }
+
+// ── Write session state for SwiftBar ─────────────────────
+try {
+  const stateFile = join(homedir(), ".claude", "session-state.json");
+  writeFileSync(stateFile, JSON.stringify({
+    status: "idle",
+    project: dirName,
+    completedAt: new Date().toISOString(),
+    duration: durationStr.replace(" · ", ""),
+    sessionStart: startTime || undefined,
+  }, null, 2) + "\n");
+} catch {}
 
 // Terminal bell
 process.stdout.write("\a");
