@@ -220,18 +220,19 @@ function uninstall(): void {
 
 // ── SwiftBar plugin dir detection ────────────────────────
 function detectSwiftBarPluginDir(): string | null {
-  // SwiftBar stores plugin dir in ~/Library/Application Support/SwiftBar/PluginDirectory.txt
-  const plistPath = join(homedir(), "Library", "Application Support", "SwiftBar", "PluginDirectory.txt");
-  if (existsSync(plistPath)) {
-    try {
-      const dir = readFileSync(plistPath, "utf-8").trim();
-      if (dir && existsSync(dir)) return dir;
-    } catch {}
-  }
+  // Primary: read from macOS defaults (com.ameba.SwiftBar → PluginDirectory)
+  try {
+    const out = execSync("defaults read com.ameba.SwiftBar PluginDirectory 2>/dev/null", {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "ignore"],
+    }).trim();
+    if (out && existsSync(out)) return out;
+  } catch {}
 
   // Fallback: check common default locations
   const candidates = [
     join(homedir(), "Library", "Application Support", "SwiftBar", "Plugins"),
+    join(homedir(), "Documents", "SwiftBarPlugins"),
     join(homedir(), ".config", "swiftbar"),
   ];
   for (const dir of candidates) {
