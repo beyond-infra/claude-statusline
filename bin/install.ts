@@ -1,7 +1,7 @@
 #!/usr/bin/env npx --yes tsx
 
 import { execSync } from "child_process";
-import { existsSync, mkdirSync, copyFileSync, unlinkSync, readFileSync, writeFileSync, symlinkSync } from "fs";
+import { existsSync, mkdirSync, copyFileSync, unlinkSync, readFileSync, writeFileSync, symlinkSync, chmodSync } from "fs";
 import { homedir } from "os";
 import { join, resolve, dirname } from "path";
 
@@ -120,6 +120,7 @@ function install(): void {
 
   // SwiftBar plugin
   copyFileSync(SWIFTBAR_SRC, SWIFTBAR_DST);
+  chmodSync(SWIFTBAR_DST, 0o755);
   ok(`Installed SwiftBar plugin to ${c.dim}${SWIFTBAR_DST}${c.rst}`);
 
   const swiftbarPluginDir = detectSwiftBarPluginDir();
