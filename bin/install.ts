@@ -19,9 +19,12 @@ const SWIFTBAR_TS_SRC = resolve(dirname(new URL(import.meta.url).pathname), "swi
 const SWIFTBAR_SH_DST = join(CLAUDE_DIR, "swiftbar-plugin.sh");
 const SWIFTBAR_SH_SRC = resolve(dirname(new URL(import.meta.url).pathname), "swiftbar-plugin.sh");
 const SWIFTBAR_NAME   = "claude-status.5s.sh";
+const START_DST       = join(CLAUDE_DIR, "task-start.ts");
+const START_SRC       = resolve(dirname(new URL(import.meta.url).pathname), "task-start.ts");
 
 const STATUS_CMD = 'npx --yes tsx "$HOME/.claude/statusline.ts"';
 const NOTIFY_CMD = 'npx --yes tsx "$HOME/.claude/task-complete.ts"';
+const START_CMD  = 'npx --yes tsx "$HOME/.claude/task-start.ts"';
 
 // ── Colors ───────────────────────────────────────────────
 const c = {
@@ -90,6 +93,9 @@ function install(): void {
   copyFileSync(NOTIFY_SRC, NOTIFY_DST);
   ok(`Installed notify to ${c.dim}${NOTIFY_DST}${c.rst}`);
 
+  copyFileSync(START_SRC, START_DST);
+  ok(`Installed task-start to ${c.dim}${START_DST}${c.rst}`);
+
   // Update settings.json
   const settings = readSettings();
   let changed = false;
@@ -102,6 +108,7 @@ function install(): void {
   }
 
   const hooks = (settings.hooks as Record<string, unknown[]>) ?? {};
+
   const stopHooks: Record<string, unknown>[] = (hooks.Stop as any) ?? [];
   const alreadyStop = stopHooks.some(
     (entry: any) => Array.isArray(entry.hooks) &&
@@ -113,9 +120,20 @@ function install(): void {
     changed = true;
   }
 
+  const submitHooks: Record<string, unknown>[] = (hooks.UserPromptSubmit as any) ?? [];
+  const alreadySubmit = submitHooks.some(
+    (entry: any) => Array.isArray(entry.hooks) &&
+      entry.hooks.some((h: any) => h.command === START_CMD)
+  );
+  if (!alreadySubmit) {
+    hooks.UserPromptSubmit = [...submitHooks, { matcher: "", hooks: [{ type: "command", command: START_CMD }] }];
+    settings.hooks = hooks;
+    changed = true;
+  }
+
   if (changed) {
     writeSettings(settings);
-    ok(`Updated ${c.dim}settings.json${c.rst} with statusLine and Stop hook`);
+    ok(`Updated ${c.dim}settings.json${c.rst} with statusLine, Stop and UserPromptSubmit hooks`);
   } else {
     ok("Settings already configured");
   }
@@ -179,6 +197,11 @@ function uninstall(): void {
     warn("No notify script found — nothing to remove");
   }
 
+  if (existsSync(START_DST)) {
+    unlinkSync(START_DST);
+    ok(`Removed ${c.dim}task-start.ts${c.rst}`);
+  }
+
   if (existsSync(SWIFTBAR_TS_DST)) unlinkSync(SWIFTBAR_TS_DST);
   if (existsSync(SWIFTBAR_SH_DST)) {
     unlinkSync(SWIFTBAR_SH_DST);
@@ -215,9 +238,21 @@ function uninstall(): void {
       }
     }
 
+    const submitHooks = (settings.hooks as any)?.UserPromptSubmit;
+    if (Array.isArray(submitHooks)) {
+      const filtered = submitHooks.filter(
+        (entry: any) => !(Array.isArray(entry.hooks) &&
+          entry.hooks.some((h: any) => h.command === START_CMD))
+      );
+      if (filtered.length !== submitHooks.length) {
+        (settings.hooks as any).UserPromptSubmit = filtered;
+        changed = true;
+      }
+    }
+
     if (changed) {
       writeSettings(settings);
-      ok(`Removed statusLine and Stop hook from ${c.dim}settings.json${c.rst}`);
+      ok(`Removed statusLine and hooks from ${c.dim}settings.json${c.rst}`);
     } else {
       ok("Settings already clean");
     }
